@@ -42,30 +42,21 @@ for entity in result:
 ## JSON structure
 
 ### Main options
-**type:** Defines the type of scrapping data, can be either `xml` or `html`
-
-**url**: Defines the url of XML feed or HTML page that will be scrapped
-
-**root**: Defines the root element at which scrapping begins
-
-**entry**: Defines the particular entries elements which will be scrapped to separate objects
-
-**elements**: Defines the scrapped properties of an entity
+* **type:** Defines the type of scrapping data, can be either `xml` or `html`
+* **url**: Defines the url of XML feed or HTML page that will be scrapped
+* **root**: Defines the root element at which scrapping begins
+* **entry**: Defines the particular entries elements which will be scrapped to separate objects
+* **elements**: Defines the scrapped properties of an entity
 
 ### Elements options
-**selector:** Defines the CSS or XML selector for the element
+* **selector:** Defines the CSS or XML selector for the element
+* **item_type:** Defines the type of item, can be either `single` or `list`
+* **attribute:** Defines the attribute of element which will be scrapped, if scrapping text use `text` else use the name of the attribute
+* **prefix:** Defines the prefix which is added to the result property
+* **suffix:** Defines the suffix which is added to the result property
+* **remove:** Defines the text which to remove from the result property
+* **replace:** Defines the text which to replace from the result property
 
-**item_type:** Defines the type of item, can be either `single` or `list`
-
-**attribute:** Defines the attribute of element which will be scrapped, if scrapping text use `text` else use the name of the attribute
-
-**prefix:** Defines the prefix which is added to the result property
-
-**suffix:** Defines the suffix which is added to the result property
-
-**remove:** Defines the text which to remove from the result property
-
-**replace:** Defines the text which to replace from the result property
 ### Example HTML
 ```json
 {
