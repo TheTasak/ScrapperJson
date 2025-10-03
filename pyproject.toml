@@ -3,10 +3,14 @@ requires = ["hatchling >= 1.26"]
 build-backend = "hatchling.build"
 
 [project]
-name = "ScrapperJson"
-version = "0.0.1"
+name = "scrapper_json_jawron"
+version = "0.0.2"
 authors = [
   { name="Przemysław Tasarz", email="horushom@gmail.com" },
+]
+dependencies = [
+    "requests==2.32.3",
+    "beautifulsoup4==4.13.4",
 ]
 description = "A simple scrapper with structured JSON support"
 readme = "README.md"
