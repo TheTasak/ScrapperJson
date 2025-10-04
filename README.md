@@ -9,14 +9,9 @@ pip install scrapper-json-jawron
 
 ## Usage:
 ```python
-from scrapper-json-jawron import Scrapper
+from scrapper-json-jawron import Scrapper, load_rules
 import json
 from dataclasses import dataclass
-
-# function to load rules from a file 
-def load_rules(path: str) -> dict:
-    with open(path, "r") as file:
-        return json.load(file)
 
 # example result dataclass
 @dataclass
