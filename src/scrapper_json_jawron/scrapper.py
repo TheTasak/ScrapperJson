@@ -1,8 +1,15 @@
+import json
 from typing import List, Type, Generic, TypeVar
 import re
 import requests
 import xml.etree.ElementTree as ET
 from bs4 import BeautifulSoup, Tag
+import dataclasses
+
+def get_rules_from_file(file: str) -> dict:
+    with open(file, 'r') as f:
+        rules = json.load(f)
+        return rules
 
 def get_element(root_element: Tag, rules: dict) -> list[Tag]|Tag|str:
     selector = rules.get('selector')
@@ -50,9 +57,12 @@ class Scrapper(Generic[T]):
         self.root_url = rules.get('url')
         self.result_class = result_class
 
-    def scrap_list(self) -> List[T]:
+    def scrap_list(self, html_file: str = None) -> List[T]:
         rules = self.rules
-        response = get_response(self.root_url)
+        if html_file is not None:
+            response = get_response(self.root_url)
+        else:
+            response = html_file
 
         entity_list = []
         if rules.get('type') == 'xml':
@@ -100,7 +110,7 @@ class Scrapper(Generic[T]):
         content = get_element(soup, article_rules.get('content'))
         entity.content = content
 
-        article = self.clean_entity(entity, clean_content=True)
+        article = self.clean_entity(entity)
         return article
 
     def iterate_elements(self, entry: Tag, rules: dict) -> dict:
@@ -129,12 +139,17 @@ class Scrapper(Generic[T]):
             item_dict[key] = item
         return item_dict
 
-    def clean_entity(self, entity: T, clean_content: bool = False) -> T:
-        if clean_content:
-            entity.content = entity.content.strip().replace('\n', '').replace('\t', '').replace("Reklama", "")
-            entity.content = re.sub(r' +', ' ', entity.content)
-        else:
-            entity.title = entity.title.strip().replace('\n', '').replace('\t', '')
-            entity.description = entity.description.strip().replace('\n', '').replace('\t', '')
-            entity.metadata = entity.metadata.strip().replace('\n', '').replace('\t', '')
+    def clean_entity(self, entity: T) -> T:
+        _RE_COMBINE_WHITESPACE = re.compile(r"\s+")
+
+        for field in dataclasses.fields(entity):
+            new_field = getattr(entity, field.name)
+            if isinstance(new_field, dict):
+                for key, value in new_field.items():
+                    new_field[key] = new_field[key].replace('\n', '').replace('\r', '').replace('\t', '')
+                    new_field[key] = _RE_COMBINE_WHITESPACE.sub(' ', new_field[key]).strip()
+            else:
+                new_field = new_field.replace('\n', '').replace('\r', '').replace('\t', '')
+                new_field = _RE_COMBINE_WHITESPACE.sub(' ', new_field).strip()
+            setattr(entity, field.name, new_field)
         return entity

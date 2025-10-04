@@ -116,3 +116,11 @@ for entity in result:
 
 Pull requests are welcome. For major changes, please open an issue first
 to discuss what you would like to change or add.
+
+## Plans for future
+* Pagination handling
+* Network error handling and retries
+* Login handling, session management
+* More export options (database, file etc.)
+* Rule-based data transformation and cleaning 
+* Support for asynchronous requests
