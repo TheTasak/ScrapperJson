@@ -60,6 +60,9 @@ def get_response(url: str, retries: int, delay: int, debug: bool = False) -> str
         return response.read()
     raise HTTPError
 
+def cleaning_functions(item: str, function: str) -> str:
+    return item
+
 T = TypeVar('T')
 
 class Scrapper(Generic[T]):
@@ -140,7 +143,7 @@ class Scrapper(Generic[T]):
 
     def scrap_entity(self, article_rules: dict, entity: T) -> T:
         url = entity.url
-        response = get_response(url)
+        response = get_response(url, self.retries, self.delay)
 
         soup = BeautifulSoup(response, "html.parser")
         content = get_element(soup, article_rules.get('content'))
@@ -171,6 +174,16 @@ class Scrapper(Generic[T]):
                     original, new = phrase.split('|')
                     if original != '' and new != '':
                         item = item.replace(original, new)
+            if item_rules.get('clean') is not None:
+                if not isinstance(item, str):
+                    print("Can't apply cleaning function to entity that is not string")
+                    continue
+                clean = item_rules.get('clean')
+                if isinstance(clean, str):
+                    item = cleaning_functions(item, clean)
+                elif isinstance(clean, list):
+                    for func in clean:
+                        item = cleaning_functions(item, func)
 
             item_dict[key] = item
         return item_dict
