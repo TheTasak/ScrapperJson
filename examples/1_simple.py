@@ -1,4 +1,4 @@
-from src.scrapper_json_jawron.scrapper import Scrapper, get_rules_from_file
+from src.scrapper_json.scrapper import Scrapper, get_rules_from_file
 from dataclasses import dataclass
 
 # example result dataclass
@@ -15,6 +15,10 @@ scr = Scrapper(rules, Article)
 
 # scrap entity list
 result = scr.scrap_list()
+
+# export to csv, json
+scr.export_to_csv("test.csv", result)
+scr.export_to_json("test.json", result)
 
 print(result)
 print(len(result))

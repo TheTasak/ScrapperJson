@@ -7,6 +7,7 @@ from urllib.error import HTTPError
 import xml.etree.ElementTree as ET
 from bs4 import BeautifulSoup, Tag
 import dataclasses
+import csv
 
 def get_rules_from_file(file: str) -> dict:
     with open(file, 'r') as f:
@@ -39,18 +40,28 @@ def get_element(root_element: Tag, rules: dict) -> list[Tag]|Tag|str:
     else:
         return root_element
 
-def get_response(url: str) -> str:
-    try:
-        headers = {
-            'User-Agent': 'Mozilla/5.0',
-            'referer': 'https://www.google.com/',
-        }
-        request = Request(url, headers=headers)
-        print(url)
-        response = urlopen(request)
-    except HTTPError as e:
-        raise Exception("HTTP Error")
-    return response.read()
+def get_response(url: str, retries: int, delay: int, debug: bool = False) -> str:
+    current_delay = delay
+    for retry in range(retries):
+        if debug:
+            print(f"Retry {retry+1} of {retries}")
+        try:
+            headers = {
+                'User-Agent': 'Mozilla/5.0',
+                'referer': 'https://www.google.com/',
+            }
+            request = Request(url, headers=headers)
+            response = urlopen(request)
+        except HTTPError as e:
+            print(f"Failed to execute function. {e}")
+            time.sleep(current_delay)
+            current_delay *= 2
+            continue
+        return response.read()
+    raise HTTPError
+
+def cleaning_functions(item: str, function: str) -> str:
+    return item
 
 T = TypeVar('T')
 
@@ -59,6 +70,8 @@ class Scrapper(Generic[T]):
         self.rules = rules
         self.root_url = rules.get('url')
         self.result_class = result_class
+        self.retries = rules.get('retries', 3)
+        self.delay = rules.get('delay', 2)
 
     def scrap_list_html(self, response: str) -> List[T]:
         entity_list = []
@@ -107,7 +120,7 @@ class Scrapper(Generic[T]):
             if content_file is not None:
                 response = content_file
             else:
-                response = get_response(self.root_url)
+                response = get_response(self.root_url, self.retries, self.delay)
             entity_list += self.scrap_list_xml(response)
         elif self.rules.get('type') == 'html':
             paginate = self.rules.get('pagination', False)
@@ -116,21 +129,21 @@ class Scrapper(Generic[T]):
                 start = 1
                 for page in range(start, limit):
                     url = self.root_url.replace("{}", str(page))
-                    response = get_response(url)
+                    response = get_response(url, self.retries, self.delay)
                     entity_list += self.scrap_list_html(response)
                 time.sleep(2)
             else:
                 if content_file is not None:
                     response = content_file
                 else:
-                    response = get_response(self.root_url)
+                    response = get_response(self.root_url, self.retries, self.delay)
                 entity_list += self.scrap_list_html(response)
 
         return entity_list
 
     def scrap_entity(self, article_rules: dict, entity: T) -> T:
         url = entity.url
-        response = get_response(url)
+        response = get_response(url, self.retries, self.delay)
 
         soup = BeautifulSoup(response, "html.parser")
         content = get_element(soup, article_rules.get('content'))
@@ -161,6 +174,16 @@ class Scrapper(Generic[T]):
                     original, new = phrase.split('|')
                     if original != '' and new != '':
                         item = item.replace(original, new)
+            if item_rules.get('clean') is not None:
+                if not isinstance(item, str):
+                    print("Can't apply cleaning function to entity that is not string")
+                    continue
+                clean = item_rules.get('clean')
+                if isinstance(clean, str):
+                    item = cleaning_functions(item, clean)
+                elif isinstance(clean, list):
+                    for func in clean:
+                        item = cleaning_functions(item, func)
 
             item_dict[key] = item
         return item_dict
@@ -179,3 +202,16 @@ class Scrapper(Generic[T]):
                 new_field = _RE_COMBINE_WHITESPACE.sub(' ', new_field).strip()
             setattr(entity, field.name, new_field)
         return entity
+
+    def export_to_csv(self, file: str, entity_list: List[T]) -> None:
+        with open(file, 'w') as csvfile:
+            writer = csv.writer(csvfile)
+            header = [field.name for field in dataclasses.fields(entity_list[0])]
+            writer.writerow(header)
+            rows = [dataclasses.asdict(entity).values() for entity in entity_list]
+            writer.writerows(rows)
+
+    def export_to_json(self, file: str, entity_list: List[T]) -> None:
+        with open(file, 'w') as jsonfile:
+            data = [dataclasses.asdict(entity) for entity in entity_list]
+            json.dump(data, jsonfile, indent=4)

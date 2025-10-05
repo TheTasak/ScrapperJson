@@ -3,8 +3,8 @@ requires = ["hatchling >= 1.26"]
 build-backend = "hatchling.build"
 
 [project]
-name = "scrapper_json_jawron"
-version = "0.0.2"
+name = "scrapper-json"
+version = "0.1.0"
 authors = [
   { name="Przemysław Tasarz", email="horushom@gmail.com" },
 ]
