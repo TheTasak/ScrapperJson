@@ -57,49 +57,71 @@ class Scrapper(Generic[T]):
         self.root_url = rules.get('url')
         self.result_class = result_class
 
-    def scrap_list(self, content_file: str = None) -> List[T]:
-        rules = self.rules
-        if content_file is None:
-            response = get_response(self.root_url)
-        else:
-            response = SimpleNamespace(content=content_file)
-
+    def scrap_list_html(self, response) -> List[T]:
         entity_list = []
-        if rules.get('type') == 'xml':
-            tree = ET.fromstring(response.content)
-            namespaces = rules.get('namespace')
-            root = tree.find(rules.get('root'), namespaces) if rules.get('root') is not None else tree
-            entries = root.findall(rules.get('entry'), namespaces)
-
-            for entry in entries:
-                entry_rules = rules.get("elements")
-                item_dict = {}
-
-                for key, item_rules in entry_rules.items():
-                    item_element = entry.find(item_rules.get('selector'), namespaces)
-                    if item_rules.get('attribute') == 'text':
-                        item = item_element.text.strip() if item_element is not None else ''
-                    else:
-                        item = item_element.attrib[item_rules.get('attribute')] if item_element is not None else ''
-
-                    if item_rules.get('prefix') is not None:
-                        item = item_rules.get('prefix') + item
-                    if item_rules.get('suffix') is not None:
-                        item = item + item_rules.get('suffix')
-                    item_dict[key] = item
-
-                page_obj = self.result_class(**item_dict)
-                entity_list.append(page_obj)
-        elif rules.get('type') == 'html':
-            soup = BeautifulSoup(response.content, "html.parser")
-            root = get_element(soup, rules.get('root'))
-            for entry in get_element(root, rules.get('entry')):
-                item_dict = self.iterate_elements(entry, rules)
-                page_obj = self.result_class(**item_dict)
-                entity_list.append(page_obj)
+        soup = BeautifulSoup(response.content, "html.parser")
+        root = get_element(soup, self.rules.get('root'))
+        for entry in get_element(root, self.rules.get('entry')):
+            item_dict = self.iterate_elements(entry, self.rules)
+            page_obj = self.result_class(**item_dict)
+            entity_list.append(page_obj)
 
         for index, article in enumerate(entity_list):
             entity_list[index] = self.clean_entity(article)
+        return entity_list
+
+    def scrap_list_xml(self, response) -> List[T]:
+        tree = ET.fromstring(response.content)
+        namespaces = self.rules.get('namespace')
+        root = tree.find(self.rules.get('root'), namespaces) if self.rules.get('root') is not None else tree
+        entries = root.findall(self.rules.get('entry'), namespaces)
+
+        entity_list = []
+        for entry in entries:
+            entry_rules = self.rules.get("elements")
+            item_dict = {}
+
+            for key, item_rules in entry_rules.items():
+                item_element = entry.find(item_rules.get('selector'), namespaces)
+                if item_rules.get('attribute') == 'text':
+                    item = item_element.text.strip() if item_element is not None else ''
+                else:
+                    item = item_element.attrib[item_rules.get('attribute')] if item_element is not None else ''
+
+                if item_rules.get('prefix') is not None:
+                    item = item_rules.get('prefix') + item
+                if item_rules.get('suffix') is not None:
+                    item = item + item_rules.get('suffix')
+                item_dict[key] = item
+
+            page_obj = self.result_class(**item_dict)
+            entity_list.append(page_obj)
+        return entity_list
+
+    def scrap_list(self, content_file: str = None) -> List[T]:
+        entity_list = []
+        if self.rules.get('type') == 'xml':
+            if content_file is not None:
+                response = SimpleNamespace(content=content_file)
+            else:
+                response = get_response(self.root_url)
+            entity_list += self.scrap_list_xml(response)
+        elif self.rules.get('type') == 'html':
+            paginate = self.rules.get('pagination', False)
+            if paginate and content_file is None:
+                limit = self.rules.get('pagination_limit', 100)
+                start = 1
+                for page in range(start, limit):
+                    url = self.root_url.replace("{}", page)
+                    response = get_response(url)
+                    entity_list += self.scrap_list_html(response)
+            elif content_file is not None:
+                response = SimpleNamespace(content=content_file)
+                entity_list += self.scrap_list_html(response)
+            else:
+                response = get_response(self.root_url)
+                entity_list += self.scrap_list_html(response)
+
         return entity_list
 
     def scrap_entity(self, article_rules: dict, entity: T) -> T:
