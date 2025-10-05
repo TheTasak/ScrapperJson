@@ -1,5 +1,6 @@
 import json
 from typing import List, Type, Generic, TypeVar
+from types import SimpleNamespace
 import re
 import requests
 import xml.etree.ElementTree as ET
@@ -45,7 +46,6 @@ def get_response(url: str) -> requests.Response:
         response = requests.get(url, headers=headers)
         response.raise_for_status()
     except requests.exceptions.HTTPError as e:
-        print("ERROR: HTTP Error", e)
         raise Exception("HTTP Error")
     return response
 
@@ -57,12 +57,12 @@ class Scrapper(Generic[T]):
         self.root_url = rules.get('url')
         self.result_class = result_class
 
-    def scrap_list(self, html_file: str = None) -> List[T]:
+    def scrap_list(self, content_file: str = None) -> List[T]:
         rules = self.rules
-        if html_file is not None:
+        if content_file is None:
             response = get_response(self.root_url)
         else:
-            response = html_file
+            response = SimpleNamespace(content=content_file)
 
         entity_list = []
         if rules.get('type') == 'xml':

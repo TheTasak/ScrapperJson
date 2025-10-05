@@ -75,9 +75,9 @@ class TestHelperFunctions(unittest.TestCase):
         mock_response.status_code = 200
         mock_get.return_value = mock_response
 
-        response = get_response("http://example.com")
+        response = get_response("https://example.com")
         self.assertEqual(response.status_code, 200)
-        mock_get.assert_called_once_with("http://example.com", headers=unittest.mock.ANY)
+        mock_get.assert_called_once_with("https://example.com", headers=unittest.mock.ANY)
 
     @patch('requests.get')
     def test_get_response_http_error(self, mock_get):
@@ -165,39 +165,32 @@ class TestScrapper(unittest.TestCase):
         }
         self.assertEqual(result_dict, expected)
 
-    def test_scrap_list_html(self, mock_get_response):
+    def test_scrap_list_html(self):
         """Should correctly scrape a list of items from an HTML source."""
-        mock_response = MagicMock()
-        mock_response.content = SAMPLE_HTML.encode('utf-8')
-        mock_get_response.return_value = mock_response
-
         rules = {
-            "type": "html", "url": "http://example.com/list",
-            "root": {"selector": "#main-content"},
+            "type": "html",
+            "url": "https://example.com/list",
+            "root": {"selector": "#main-content", "attribute": "element"},
             "entry": {"selector": ".item-list li", "item_type": "list"},
             "elements": {
                 "url": {"selector": "a", "attribute": "href"},
-                "title": {"selector": "a"},
-                "metadata": {"selector": "span"}
+                "title": {"selector": "a", "attribute": "text"},
+                "metadata": {"selector": "span", "attribute": "text"}
             }
         }
 
         scrapper = Scrapper(rules, MockArticle)
-        results = scrapper.scrap_list()
+
+        results = scrapper.scrap_list(content_file=SAMPLE_HTML)
 
         self.assertEqual(len(results), 3)
         self.assertIsInstance(results[0], MockArticle)
         self.assertEqual(results[0].title, "Article 1")
         self.assertEqual(results[0].url, "/article1")
         self.assertEqual(results[1].metadata, "Meta 2")
-        mock_get_response.assert_called_with("http://example.com/list")
 
-    def test_scrap_list_xml(self, mock_get_response):
+    def test_scrap_list_xml(self):
         """Should correctly scrape a list of items from an XML source."""
-        mock_response = MagicMock()
-        mock_response.content = SAMPLE_XML.encode('utf-8')
-        mock_get_response.return_value = mock_response
-
         rules = {
             "type": "xml", "url": "http://example.com/feed.xml",
             "namespace": {"atom": "http://www.w3.org/2005/Atom"},
@@ -210,7 +203,7 @@ class TestScrapper(unittest.TestCase):
         }
 
         scrapper = Scrapper(rules, MockArticle)
-        results = scrapper.scrap_list()
+        results = scrapper.scrap_list(content_file=SAMPLE_XML)
 
         self.assertEqual(len(results), 2)
         self.assertEqual(results[0].title, "Atom-Powered Robots Run Amok")
