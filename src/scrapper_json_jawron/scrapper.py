@@ -1,8 +1,17 @@
+import json
+import time
 from typing import List, Type, Generic, TypeVar
 import re
-import requests
+from urllib.request import Request, urlopen
+from urllib.error import HTTPError
 import xml.etree.ElementTree as ET
 from bs4 import BeautifulSoup, Tag
+import dataclasses
+
+def get_rules_from_file(file: str) -> dict:
+    with open(file, 'r') as f:
+        rules = json.load(f)
+        return rules
 
 def get_element(root_element: Tag, rules: dict) -> list[Tag]|Tag|str:
     selector = rules.get('selector')
@@ -30,17 +39,18 @@ def get_element(root_element: Tag, rules: dict) -> list[Tag]|Tag|str:
     else:
         return root_element
 
-def get_response(url: str) -> requests.Response:
+def get_response(url: str) -> str:
     try:
         headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            'User-Agent': 'Mozilla/5.0',
+            'referer': 'https://www.google.com/',
         }
-        response = requests.get(url, headers=headers)
-        response.raise_for_status()
-    except requests.exceptions.HTTPError as e:
-        print("ERROR: HTTP Error", e)
+        request = Request(url, headers=headers)
+        print(url)
+        response = urlopen(request)
+    except HTTPError as e:
         raise Exception("HTTP Error")
-    return response
+    return response.read()
 
 T = TypeVar('T')
 
@@ -50,57 +60,83 @@ class Scrapper(Generic[T]):
         self.root_url = rules.get('url')
         self.result_class = result_class
 
-    def scrap_list(self) -> List[T]:
-        rules = self.rules
-        response = get_response(self.root_url)
-
+    def scrap_list_html(self, response: str) -> List[T]:
         entity_list = []
-        if rules.get('type') == 'xml':
-            tree = ET.fromstring(response.content)
-            namespaces = rules.get('namespace')
-            root = tree.find(rules.get('root'), namespaces) if rules.get('root') is not None else tree
-            entries = root.findall(rules.get('entry'), namespaces)
-
-            for entry in entries:
-                entry_rules = rules.get("elements")
-                item_dict = {}
-
-                for key, item_rules in entry_rules.items():
-                    item_element = entry.find(item_rules.get('selector'), namespaces)
-                    if item_rules.get('attribute') == 'text':
-                        item = item_element.text.strip() if item_element is not None else ''
-                    else:
-                        item = item_element.attrib[item_rules.get('attribute')] if item_element is not None else ''
-
-                    if item_rules.get('prefix') is not None:
-                        item = item_rules.get('prefix') + item
-                    if item_rules.get('suffix') is not None:
-                        item = item + item_rules.get('suffix')
-                    item_dict[key] = item
-
-                page_obj = self.result_class(**item_dict)
-                entity_list.append(page_obj)
-        elif rules.get('type') == 'html':
-            soup = BeautifulSoup(response.content, "html.parser")
-            root = get_element(soup, rules.get('root'))
-            for entry in get_element(root, rules.get('entry')):
-                item_dict = self.iterate_elements(entry, rules)
-                page_obj = self.result_class(**item_dict)
-                entity_list.append(page_obj)
+        soup = BeautifulSoup(response, "html.parser")
+        root = get_element(soup, self.rules.get('root'))
+        for entry in get_element(root, self.rules.get('entry')):
+            item_dict = self.iterate_elements(entry, self.rules)
+            page_obj = self.result_class(**item_dict)
+            entity_list.append(page_obj)
 
         for index, article in enumerate(entity_list):
             entity_list[index] = self.clean_entity(article)
+        return entity_list
+
+    def scrap_list_xml(self, response: str) -> List[T]:
+        tree = ET.fromstring(response)
+        namespaces = self.rules.get('namespace')
+        root = tree.find(self.rules.get('root'), namespaces) if self.rules.get('root') is not None else tree
+        entries = root.findall(self.rules.get('entry'), namespaces)
+
+        entity_list = []
+        for entry in entries:
+            entry_rules = self.rules.get("elements")
+            item_dict = {}
+
+            for key, item_rules in entry_rules.items():
+                item_element = entry.find(item_rules.get('selector'), namespaces)
+                if item_rules.get('attribute') == 'text':
+                    item = item_element.text.strip() if item_element is not None else ''
+                else:
+                    item = item_element.attrib[item_rules.get('attribute')] if item_element is not None else ''
+
+                if item_rules.get('prefix') is not None:
+                    item = item_rules.get('prefix') + item
+                if item_rules.get('suffix') is not None:
+                    item = item + item_rules.get('suffix')
+                item_dict[key] = item
+
+            page_obj = self.result_class(**item_dict)
+            entity_list.append(page_obj)
+        return entity_list
+
+    def scrap_list(self, content_file: str = None) -> List[T]:
+        entity_list = []
+        if self.rules.get('type') == 'xml':
+            if content_file is not None:
+                response = content_file
+            else:
+                response = get_response(self.root_url)
+            entity_list += self.scrap_list_xml(response)
+        elif self.rules.get('type') == 'html':
+            paginate = self.rules.get('pagination', False)
+            if paginate and content_file is None:
+                limit = self.rules.get('pagination_limit', 100)
+                start = 1
+                for page in range(start, limit):
+                    url = self.root_url.replace("{}", str(page))
+                    response = get_response(url)
+                    entity_list += self.scrap_list_html(response)
+                time.sleep(2)
+            else:
+                if content_file is not None:
+                    response = content_file
+                else:
+                    response = get_response(self.root_url)
+                entity_list += self.scrap_list_html(response)
+
         return entity_list
 
     def scrap_entity(self, article_rules: dict, entity: T) -> T:
         url = entity.url
         response = get_response(url)
 
-        soup = BeautifulSoup(response.content, "html.parser")
+        soup = BeautifulSoup(response, "html.parser")
         content = get_element(soup, article_rules.get('content'))
         entity.content = content
 
-        article = self.clean_entity(entity, clean_content=True)
+        article = self.clean_entity(entity)
         return article
 
     def iterate_elements(self, entry: Tag, rules: dict) -> dict:
@@ -129,12 +165,17 @@ class Scrapper(Generic[T]):
             item_dict[key] = item
         return item_dict
 
-    def clean_entity(self, entity: T, clean_content: bool = False) -> T:
-        if clean_content:
-            entity.content = entity.content.strip().replace('\n', '').replace('\t', '').replace("Reklama", "")
-            entity.content = re.sub(r' +', ' ', entity.content)
-        else:
-            entity.title = entity.title.strip().replace('\n', '').replace('\t', '')
-            entity.description = entity.description.strip().replace('\n', '').replace('\t', '')
-            entity.metadata = entity.metadata.strip().replace('\n', '').replace('\t', '')
+    def clean_entity(self, entity: T) -> T:
+        _RE_COMBINE_WHITESPACE = re.compile(r"\s+")
+
+        for field in dataclasses.fields(entity):
+            new_field = getattr(entity, field.name)
+            if isinstance(new_field, dict):
+                for key, value in new_field.items():
+                    new_field[key] = new_field[key].replace('\n', '').replace('\r', '').replace('\t', '')
+                    new_field[key] = _RE_COMBINE_WHITESPACE.sub(' ', new_field[key]).strip()
+            else:
+                new_field = new_field.replace('\n', '').replace('\r', '').replace('\t', '')
+                new_field = _RE_COMBINE_WHITESPACE.sub(' ', new_field).strip()
+            setattr(entity, field.name, new_field)
         return entity

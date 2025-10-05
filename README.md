@@ -9,23 +9,17 @@ pip install scrapper-json-jawron
 
 ## Usage:
 ```python
-from scrapper-json-jawron import Scrapper
-import json
+from scrapper-json-jawron import Scrapper, get_rules_from_file
 from dataclasses import dataclass
-
-# function to load rules from a file 
-def load_rules(path: str) -> dict:
-    with open(path, "r") as file:
-        return json.load(file)
 
 # example result dataclass
 @dataclass
 class Article:
     url: str
     title: str
-    content: str
+    content: str = ""
         
-rules = load_rules("example.json")
+rules = get_rules_from_file("example.json")
 
 # create templated scrapper
 scr = Scrapper(rules, Article)
@@ -34,7 +28,7 @@ scr = Scrapper(rules, Article)
 result = scr.scrap_list()
 
 # scrap entity details
-entity_rules = load_rules("example_entity.json")
+entity_rules = get_rules_from_file("example_entity.json")
 for entity in result:
     entity_result = scr.scrap_entity(entity_rules, entity)
 ```
@@ -43,6 +37,8 @@ for entity in result:
 
 ### Main options
 * **type:** Defines the type of scrapping data, can be either `xml` or `html`
+* **pagination:** Defines if the scrapping should perform pagination using a templated url from rules file, `default: false`
+* **pagination_limit:** Defines the number of pages to scrape, `default: 100`
 * **url**: Defines the url of XML feed or HTML page that will be scrapped
 * **root**: Defines the root element at which scrapping begins
 * **entry**: Defines the particular entries elements which will be scrapped to separate objects
@@ -50,12 +46,12 @@ for entity in result:
 
 ### Elements options
 * **selector:** Defines the CSS or XML selector for the element
-* **item_type:** Defines the type of item, can be either `single` or `list`
-* **attribute:** Defines the attribute of element which will be scrapped, if scrapping text use `text` else use the name of the attribute
+* **item_type:** Defines the type of item, can be either `single` or `list`, `default: single`
+* **attribute:** Defines the attribute of element which will be scrapped, if scrapping text use `text`, else use the name of the attribute. You can also scrape an element as an object to use in nested properties. `default: text`
 * **prefix:** Defines the prefix which is added to the result property
 * **suffix:** Defines the suffix which is added to the result property
-* **remove:** Defines the text which to remove from the result property
-* **replace:** Defines the text which to replace from the result property
+* **remove:** Defines the text which is to be removed from the result property
+* **replace:** Defines the text which is to be replaced from the result property
 
 ### Example HTML
 ```json
@@ -79,10 +75,6 @@ for entity in result:
     "url": {
       "selector": "div.search-txt a",
       "attribute": "href"
-    },
-    "content": {
-      "selector": null,
-      "attribute": "text"
     }
   }
 }
@@ -103,10 +95,6 @@ for entity in result:
     "url": {
       "selector": "link",
       "attribute": "text"
-    },
-    "content": {
-      "selector": null,
-      "attribute": "text"
     }
   }
 }
@@ -116,3 +104,11 @@ for entity in result:
 
 Pull requests are welcome. For major changes, please open an issue first
 to discuss what you would like to change or add.
+
+## Plans for future
+* Pagination handling ✅
+* Network error handling and retries
+* Login handling, session management
+* More export options (database, file etc.)
+* Rule-based data transformation and cleaning 
+* Support for asynchronous requests
