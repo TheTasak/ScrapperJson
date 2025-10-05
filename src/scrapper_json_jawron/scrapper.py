@@ -7,6 +7,7 @@ from urllib.error import HTTPError
 import xml.etree.ElementTree as ET
 from bs4 import BeautifulSoup, Tag
 import dataclasses
+import csv
 
 def get_rules_from_file(file: str) -> dict:
     with open(file, 'r') as f:
@@ -188,3 +189,16 @@ class Scrapper(Generic[T]):
                 new_field = _RE_COMBINE_WHITESPACE.sub(' ', new_field).strip()
             setattr(entity, field.name, new_field)
         return entity
+
+    def export_to_csv(self, file: str, entity_list: List[T]) -> None:
+        with open(file, 'w') as csvfile:
+            writer = csv.writer(csvfile)
+            header = [field.name for field in dataclasses.fields(entity_list[0])]
+            writer.writerow(header)
+            rows = [dataclasses.asdict(entity).values() for entity in entity_list]
+            writer.writerows(rows)
+
+    def export_to_json(self, file: str, entity_list: List[T]) -> None:
+        with open(file, 'w') as jsonfile:
+            data = [dataclasses.asdict(entity) for entity in entity_list]
+            json.dump(data, jsonfile, indent=4)

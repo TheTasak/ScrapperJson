@@ -16,5 +16,9 @@ scr = Scrapper(rules, Article)
 # scrap entity list
 result = scr.scrap_list()
 
+# export to csv, json
+scr.export_to_csv("test.csv", result)
+scr.export_to_json("test.json", result)
+
 print(result)
 print(len(result))

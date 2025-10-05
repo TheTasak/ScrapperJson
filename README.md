@@ -107,8 +107,9 @@ to discuss what you would like to change or add.
 
 ## Plans for future
 * Pagination handling ✅
-* Network error handling and retries
+* Network error handling and retries ✅
+* More export options (file etc.) ✅
 * Login handling, session management
-* More export options (database, file etc.)
+* Export to database
 * Rule-based data transformation and cleaning 
 * Support for asynchronous requests
