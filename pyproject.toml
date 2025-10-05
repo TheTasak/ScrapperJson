@@ -9,7 +9,6 @@ authors = [
   { name="Przemysław Tasarz", email="horushom@gmail.com" },
 ]
 dependencies = [
-    "requests==2.32.3",
     "beautifulsoup4==4.13.4",
 ]
 description = "A simple scrapper with structured JSON support"

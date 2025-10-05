@@ -76,7 +76,7 @@ class TestHelperFunctions(unittest.TestCase):
         mock_get.return_value = mock_response
 
         response = get_response("https://example.com")
-        self.assertEqual(response.status_code, 200)
+        self.assertIsInstance(response, bytes)
         mock_get.assert_called_once_with("https://example.com", headers=unittest.mock.ANY)
 
     @patch('requests.get')

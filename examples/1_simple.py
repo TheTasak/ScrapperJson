@@ -6,7 +6,7 @@ from dataclasses import dataclass
 class Article:
     url: str
     title: str
-    content: str
+    content: str = ""
 
 rules = get_rules_from_file("1_list_rules.json")
 

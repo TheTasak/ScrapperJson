@@ -1,7 +1,6 @@
 import json
 import time
 from typing import List, Type, Generic, TypeVar
-from types import SimpleNamespace
 import re
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError
