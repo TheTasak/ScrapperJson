@@ -4,7 +4,7 @@ from unittest.mock import patch, mock_open, MagicMock
 from bs4 import BeautifulSoup, Tag
 from dataclasses import dataclass, field
 
-from src.scrapper_json.scrapper import get_rules_from_file, get_element, get_response, Scrapper
+from src.scrapper_json_jawron.scrapper import get_rules_from_file, get_element, get_response, Scrapper
 
 @dataclass
 class MockArticle:

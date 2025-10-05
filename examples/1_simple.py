@@ -1,4 +1,4 @@
-from src.scrapper_json.scrapper import Scrapper, get_rules_from_file
+from src.scrapper_json_jawron.scrapper import Scrapper, get_rules_from_file
 from dataclasses import dataclass
 
 # example result dataclass
