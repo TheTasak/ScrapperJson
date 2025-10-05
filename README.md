@@ -9,8 +9,7 @@ pip install scrapper-json-jawron
 
 ## Usage:
 ```python
-from scrapper-json-jawron import Scrapper, load_rules
-import json
+from scrapper-json-jawron import Scrapper, get_rules_from_file
 from dataclasses import dataclass
 
 # example result dataclass
@@ -20,7 +19,7 @@ class Article:
     title: str
     content: str
         
-rules = load_rules("example.json")
+rules = get_rules_from_file("example.json")
 
 # create templated scrapper
 scr = Scrapper(rules, Article)
@@ -29,7 +28,7 @@ scr = Scrapper(rules, Article)
 result = scr.scrap_list()
 
 # scrap entity details
-entity_rules = load_rules("example_entity.json")
+entity_rules = get_rules_from_file("example_entity.json")
 for entity in result:
     entity_result = scr.scrap_entity(entity_rules, entity)
 ```

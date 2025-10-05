@@ -1,8 +1,10 @@
 import json
+import time
 from typing import List, Type, Generic, TypeVar
 from types import SimpleNamespace
 import re
-import requests
+from urllib.request import Request, urlopen
+from urllib.error import HTTPError
 import xml.etree.ElementTree as ET
 from bs4 import BeautifulSoup, Tag
 import dataclasses
@@ -38,16 +40,18 @@ def get_element(root_element: Tag, rules: dict) -> list[Tag]|Tag|str:
     else:
         return root_element
 
-def get_response(url: str) -> requests.Response:
+def get_response(url: str) -> str:
     try:
         headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            'User-Agent': 'Mozilla/5.0',
+            'referer': 'https://www.google.com/',
         }
-        response = requests.get(url, headers=headers)
-        response.raise_for_status()
-    except requests.exceptions.HTTPError as e:
+        request = Request(url, headers=headers)
+        print(url)
+        response = urlopen(request)
+    except HTTPError as e:
         raise Exception("HTTP Error")
-    return response
+    return response.read()
 
 T = TypeVar('T')
 
@@ -57,9 +61,9 @@ class Scrapper(Generic[T]):
         self.root_url = rules.get('url')
         self.result_class = result_class
 
-    def scrap_list_html(self, response) -> List[T]:
+    def scrap_list_html(self, response: str) -> List[T]:
         entity_list = []
-        soup = BeautifulSoup(response.content, "html.parser")
+        soup = BeautifulSoup(response, "html.parser")
         root = get_element(soup, self.rules.get('root'))
         for entry in get_element(root, self.rules.get('entry')):
             item_dict = self.iterate_elements(entry, self.rules)
@@ -70,8 +74,8 @@ class Scrapper(Generic[T]):
             entity_list[index] = self.clean_entity(article)
         return entity_list
 
-    def scrap_list_xml(self, response) -> List[T]:
-        tree = ET.fromstring(response.content)
+    def scrap_list_xml(self, response: str) -> List[T]:
+        tree = ET.fromstring(response)
         namespaces = self.rules.get('namespace')
         root = tree.find(self.rules.get('root'), namespaces) if self.rules.get('root') is not None else tree
         entries = root.findall(self.rules.get('entry'), namespaces)
@@ -102,7 +106,7 @@ class Scrapper(Generic[T]):
         entity_list = []
         if self.rules.get('type') == 'xml':
             if content_file is not None:
-                response = SimpleNamespace(content=content_file)
+                response = content_file
             else:
                 response = get_response(self.root_url)
             entity_list += self.scrap_list_xml(response)
@@ -112,14 +116,15 @@ class Scrapper(Generic[T]):
                 limit = self.rules.get('pagination_limit', 100)
                 start = 1
                 for page in range(start, limit):
-                    url = self.root_url.replace("{}", page)
+                    url = self.root_url.replace("{}", str(page))
                     response = get_response(url)
                     entity_list += self.scrap_list_html(response)
-            elif content_file is not None:
-                response = SimpleNamespace(content=content_file)
-                entity_list += self.scrap_list_html(response)
+                time.sleep(2)
             else:
-                response = get_response(self.root_url)
+                if content_file is not None:
+                    response = content_file
+                else:
+                    response = get_response(self.root_url)
                 entity_list += self.scrap_list_html(response)
 
         return entity_list
@@ -128,7 +133,7 @@ class Scrapper(Generic[T]):
         url = entity.url
         response = get_response(url)
 
-        soup = BeautifulSoup(response.content, "html.parser")
+        soup = BeautifulSoup(response, "html.parser")
         content = get_element(soup, article_rules.get('content'))
         entity.content = content
 
