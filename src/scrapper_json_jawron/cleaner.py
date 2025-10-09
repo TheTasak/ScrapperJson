@@ -59,7 +59,6 @@ class Cleaner:
 
         processed_value = item
         for rule in rules:
-            print(rule, processed_value)
             try:
                 if isinstance(rule, str):
                     enum_member = CleaningFunction[rule]

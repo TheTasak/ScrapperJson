@@ -182,6 +182,7 @@ class Scrapper(Generic[T]):
                 item = Cleaner().apply(item, clean)
             else: # default cleaning rules
                 if not isinstance(item, str):
+                    item_dict[key] = item
                     continue
                 clean = ["REMOVE_NEWLINES", "COLLAPSE_WHITESPACE", "STRIP"]
                 item = Cleaner().apply(item, clean)
