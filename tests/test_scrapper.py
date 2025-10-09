@@ -1,3 +1,4 @@
+import datetime
 import unittest
 from unittest.mock import patch, mock_open, MagicMock
 from urllib.request import Request, urlopen
@@ -26,9 +27,9 @@ SAMPLE_HTML = """
         <h1>Main Title</h1>
         <p>Some paragraph text.</p>
         <ul class="item-list">
-            <li class="item"><a href="/article1">Article 1</a><span>Meta 1</span></li>
+            <li class="item"><a href="/article1">Article 1</a><span>Meta 1</span><span>2025-06-12</span></li>
             <li>Paragraph</li>
-            <li class="item"><a href="/article2">Article 2</a><span>Meta 2</span></li>
+            <li class="item"><a href="/article2">Article 2</a><span>Meta 1</span></li>
             <li class="special-item"><a href="/article3">Article 3</a><span>Meta 3</span></li>
         </ul>
         <div id="footer" data-info="footer-info">Footer content</div>
@@ -163,7 +164,7 @@ class TestScrapper(unittest.TestCase):
                     "selector": "a", "attribute": "text", "remove": [" 1"]
                 },
                 "metadata": {
-                    "selector": "span", "attribute": "text", "replace": ["Meta|Category"]
+                    "selector": "span", "attribute": "text", "index": 1, "clean": [{"name": "TO_DATE", "format": "%Y-%m-%d"}]
                 }
             }
         }
@@ -171,7 +172,7 @@ class TestScrapper(unittest.TestCase):
         expected = {
             'url': 'http://base.url/article1'.upper(),
             'title': 'Article',
-            'metadata': 'Category 1'
+            'metadata': datetime.datetime(2025, 6, 12).date(),
         }
         self.assertEqual(result_dict, expected)
 
@@ -222,7 +223,7 @@ class TestScrapper(unittest.TestCase):
         self.assertIsInstance(results[0], MockArticle)
         self.assertEqual(results[0].title, "Article 1")
         self.assertEqual(results[0].url, "/article1")
-        self.assertEqual(results[2].metadata, "Meta 2")
+        self.assertEqual(results[2].metadata, "Meta 1")
 
     def test_scrap_list_xml(self):
         """Should correctly scrape a list of items from an XML source."""
@@ -244,15 +245,6 @@ class TestScrapper(unittest.TestCase):
         self.assertEqual(results[0].title, "Atom-Powered Robots Run Amok")
         self.assertEqual(results[0].url, "http://example.org/2003/12/13/atom03")
         self.assertEqual(results[0].description, "Some text....")
-
-    def test_clean_entity_with_content(self):
-        """Should correctly clean an entity's content field."""
-        scrapper = Scrapper({}, MockArticle)
-        messy_article = MockArticle(content="  \nSome   extra    content.\t")
-
-        cleaned_article = scrapper.clean_entity(messy_article)
-        self.assertEqual(cleaned_article.content, "Some extra content.")
-
 
 if __name__ == '__main__':
     unittest.main(argv=['first-arg-is-ignored'], exit=False)

@@ -85,8 +85,6 @@ class Scrapper(Generic[T]):
             page_obj = self.result_class(**item_dict)
             entity_list.append(page_obj)
 
-        for index, article in enumerate(entity_list):
-            entity_list[index] = self.clean_entity(article)
         return entity_list
 
     def _scrap_list_xml(self, response: str) -> List[T]:
@@ -151,9 +149,7 @@ class Scrapper(Generic[T]):
         soup = BeautifulSoup(response, "html.parser")
         content = get_element(soup, article_rules.get('content'))
         entity.content = content
-
-        article = self.clean_entity(entity)
-        return article
+        return entity
 
     def iterate_elements(self, entry: Tag, rules: dict) -> dict:
         entry_rules = rules.get("elements")
@@ -183,26 +179,15 @@ class Scrapper(Generic[T]):
                     print("Can't apply cleaning function to entity that is not string")
                     continue
                 clean = item_rules.get('clean')
-                cleaner = Cleaner()
-                item = cleaner.apply(item, clean)
+                item = Cleaner().apply(item, clean)
+            else: # default cleaning rules
+                if not isinstance(item, str):
+                    continue
+                clean = ["REMOVE_NEWLINES", "COLLAPSE_WHITESPACE", "STRIP"]
+                item = Cleaner().apply(item, clean)
 
             item_dict[key] = item
         return item_dict
-
-    def clean_entity(self, entity: T) -> T:
-        _RE_COMBINE_WHITESPACE = re.compile(r"\s+")
-
-        for field in dataclasses.fields(entity):
-            new_field = getattr(entity, field.name)
-            if isinstance(new_field, dict):
-                for key, value in new_field.items():
-                    new_field[key] = new_field[key].replace('\n', '').replace('\r', '').replace('\t', '')
-                    new_field[key] = _RE_COMBINE_WHITESPACE.sub(' ', new_field[key]).strip()
-            else:
-                new_field = new_field.replace('\n', '').replace('\r', '').replace('\t', '')
-                new_field = _RE_COMBINE_WHITESPACE.sub(' ', new_field).strip()
-            setattr(entity, field.name, new_field)
-        return entity
 
     def export_to_csv(self, file: str, entity_list: List[T]) -> None:
         with open(file, 'w') as csvfile:

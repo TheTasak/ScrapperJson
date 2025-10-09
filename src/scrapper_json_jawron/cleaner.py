@@ -25,8 +25,6 @@ class Cleaner:
             CleaningFunction.STRIP: lambda text: text.strip(),
             CleaningFunction.REMOVE_NEWLINES: lambda text: text.replace('\n', ''),
             CleaningFunction.COLLAPSE_WHITESPACE: lambda text: re.sub(r'\s+', ' ', text).strip(),
-            CleaningFunction.TO_DATE: lambda text: datetime.strptime(text, '%Y-%m-%d').date(),
-            CleaningFunction.TO_DATETIME: lambda text: datetime.strptime(text, '%Y-%m-%d %H:%M:%S'),
             CleaningFunction.TO_LOWERCASE: lambda text: text.lower(),
             CleaningFunction.TO_UPPERCASE: lambda text: text.upper(),
             CleaningFunction.TO_TITLECASE: lambda text: text.title(),
@@ -61,6 +59,7 @@ class Cleaner:
 
         processed_value = item
         for rule in rules:
+            print(rule, processed_value)
             try:
                 if isinstance(rule, str):
                     enum_member = CleaningFunction[rule]
@@ -68,11 +67,14 @@ class Cleaner:
                         processed_value = self.rules_map[enum_member](processed_value)
                 elif isinstance(rule, dict):
                     enum_member = CleaningFunction[rule.get('name')]
-                    if enum_member in self.rules_map:
-                        if enum_member == CleaningFunction.REMOVE_PREFIX:
-                            processed_value = processed_value.removeprefix(rule.get('value'))
-                        elif enum_member == CleaningFunction.REMOVE_SUFFIX:
-                            processed_value = processed_value.removesuffix(rule.get('value'))
+                    if enum_member == CleaningFunction.REMOVE_PREFIX:
+                        processed_value = processed_value.removeprefix(rule.get('value'))
+                    elif enum_member == CleaningFunction.REMOVE_SUFFIX:
+                        processed_value = processed_value.removesuffix(rule.get('value'))
+                    elif enum_member == CleaningFunction.TO_DATE:
+                        processed_value = datetime.strptime(processed_value, rule.get('format')).date()
+                    elif enum_member == CleaningFunction.TO_DATETIME:
+                        processed_value = datetime.strptime(processed_value, rule.get('format'))
             except(KeyError, IndexError, TypeError):
                 print(f"Warning: Could not apply invalid cleaning rule: {rule}")
                 continue
