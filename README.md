@@ -46,6 +46,7 @@ for entity in result:
 
 ### Elements options
 * **selector:** Defines the CSS or XML selector for the element
+* **index:** Defines the index of the element to scrape, if a selector returns multiple elements
 * **item_type:** Defines the type of item, can be either `single` or `list`, `default: single`
 * **attribute:** Defines the attribute of element which will be scrapped, if scrapping text use `text`, else use the name of the attribute. You can also scrape an element as an object to use in nested properties. `default: text`
 * **prefix:** Defines the prefix which is added to the result property
@@ -110,6 +111,7 @@ to discuss what you would like to change or add.
 * Network error handling and retries ✅
 * More export options (file etc.) ✅
 * Login handling, session management
+* Custom pagination functions
 * Export to database
 * Rule-based data transformation and cleaning 
 * Support for asynchronous requests

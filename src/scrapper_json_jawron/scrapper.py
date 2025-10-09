@@ -8,32 +8,38 @@ import xml.etree.ElementTree as ET
 from bs4 import BeautifulSoup, Tag
 import dataclasses
 import csv
+from src.scrapper_json_jawron.cleaner import Cleaner
 
 def get_rules_from_file(file: str) -> dict:
     with open(file, 'r') as f:
         rules = json.load(f)
         return rules
 
+def get_element_attribute(element: Tag, attribute: str) -> Tag|str:
+    if attribute == "text":
+        return element.get_text(strip=True)
+    elif attribute == "element":
+        return element
+    else:
+        return element.get(attribute)
+
 def get_element(root_element: Tag, rules: dict) -> list[Tag]|Tag|str:
     selector = rules.get('selector')
     attribute = rules.get('attribute', 'text')
     item_type = rules.get('item_type', 'single')
+    index = rules.get('index', 0)
 
     if selector is None:
-        print("ERROR: no selector.")
-        return root_element
+        return get_element_attribute(root_element, attribute)
 
     if item_type == 'single':
-        element = root_element.select_one(selector)
-        if element is None:
+        element_list = root_element.select(selector, limit=index+1)
+        check_length = len(element_list) == 0 or len(element_list) <= index
+        if element_list is None or check_length:
             return ""
 
-        if attribute == "text":
-            return element.get_text(strip=True)
-        elif attribute == "element":
-            return element
-        else:
-            return element.get(attribute)
+        element = element_list[index]
+        return get_element_attribute(element, attribute)
     elif item_type == 'list':
         elements = root_element.select(selector)
         return elements
@@ -60,9 +66,6 @@ def get_response(url: str, retries: int, delay: int, debug: bool = False) -> str
         return response.read()
     raise HTTPError
 
-def cleaning_functions(item: str, function: str) -> str:
-    return item
-
 T = TypeVar('T')
 
 class Scrapper(Generic[T]):
@@ -73,7 +76,7 @@ class Scrapper(Generic[T]):
         self.retries = rules.get('retries', 3)
         self.delay = rules.get('delay', 2)
 
-    def scrap_list_html(self, response: str) -> List[T]:
+    def _scrap_list_html(self, response: str) -> List[T]:
         entity_list = []
         soup = BeautifulSoup(response, "html.parser")
         root = get_element(soup, self.rules.get('root'))
@@ -86,7 +89,7 @@ class Scrapper(Generic[T]):
             entity_list[index] = self.clean_entity(article)
         return entity_list
 
-    def scrap_list_xml(self, response: str) -> List[T]:
+    def _scrap_list_xml(self, response: str) -> List[T]:
         tree = ET.fromstring(response)
         namespaces = self.rules.get('namespace')
         root = tree.find(self.rules.get('root'), namespaces) if self.rules.get('root') is not None else tree
@@ -121,7 +124,7 @@ class Scrapper(Generic[T]):
                 response = content_file
             else:
                 response = get_response(self.root_url, self.retries, self.delay)
-            entity_list += self.scrap_list_xml(response)
+            entity_list += self._scrap_list_xml(response)
         elif self.rules.get('type') == 'html':
             paginate = self.rules.get('pagination', False)
             if paginate and content_file is None:
@@ -130,14 +133,14 @@ class Scrapper(Generic[T]):
                 for page in range(start, limit):
                     url = self.root_url.replace("{}", str(page))
                     response = get_response(url, self.retries, self.delay)
-                    entity_list += self.scrap_list_html(response)
+                    entity_list += self._scrap_list_html(response)
                 time.sleep(2)
             else:
                 if content_file is not None:
                     response = content_file
                 else:
                     response = get_response(self.root_url, self.retries, self.delay)
-                entity_list += self.scrap_list_html(response)
+                entity_list += self._scrap_list_html(response)
 
         return entity_list
 
@@ -157,7 +160,8 @@ class Scrapper(Generic[T]):
         item_dict = {}
 
         for key, item_rules in entry_rules.items():
-            item = get_element(entry, item_rules) if item_rules.get('selector') is not None else ''
+            item = get_element(entry, item_rules)
+
             if item_rules.get('elements') is not None:
                 item = self.iterate_elements(item, item_rules)
             if item_rules.get('prefix') is not None:
@@ -179,11 +183,8 @@ class Scrapper(Generic[T]):
                     print("Can't apply cleaning function to entity that is not string")
                     continue
                 clean = item_rules.get('clean')
-                if isinstance(clean, str):
-                    item = cleaning_functions(item, clean)
-                elif isinstance(clean, list):
-                    for func in clean:
-                        item = cleaning_functions(item, func)
+                cleaner = Cleaner()
+                item = cleaner.apply(item, clean)
 
             item_dict[key] = item
         return item_dict

@@ -1,10 +1,12 @@
 import unittest
-import requests
 from unittest.mock import patch, mock_open, MagicMock
+from urllib.request import Request, urlopen
+from urllib.error import HTTPError
+
 from bs4 import BeautifulSoup, Tag
 from dataclasses import dataclass, field
 
-from src.scrapper_json_jawron import get_rules_from_file, get_element, get_response, Scrapper
+from src.scrapper_json_jawron.scrapper import get_rules_from_file, get_element, get_response, Scrapper
 
 @dataclass
 class MockArticle:
@@ -25,6 +27,7 @@ SAMPLE_HTML = """
         <p>Some paragraph text.</p>
         <ul class="item-list">
             <li class="item"><a href="/article1">Article 1</a><span>Meta 1</span></li>
+            <li>Paragraph</li>
             <li class="item"><a href="/article2">Article 2</a><span>Meta 2</span></li>
             <li class="special-item"><a href="/article3">Article 3</a><span>Meta 3</span></li>
         </ul>
@@ -75,7 +78,7 @@ class TestHelperFunctions(unittest.TestCase):
         mock_response.status_code = 200
         mock_get.return_value = mock_response
 
-        response = get_response("https://example.com")
+        response = get_response("https://example.com", retries=3, delay=2)
         self.assertIsInstance(response, bytes)
         mock_get.assert_called_once_with("https://example.com", headers=unittest.mock.ANY)
 
@@ -83,11 +86,11 @@ class TestHelperFunctions(unittest.TestCase):
     def test_get_response_http_error(self, mock_get):
         """Should raise an Exception on an HTTP error."""
         mock_response = MagicMock()
-        mock_response.raise_for_status.side_effect = requests.exceptions.HTTPError("404 Client Error")
+        mock_response.raise_for_status.side_effect = HTTPError
         mock_get.return_value = mock_response
 
-        with self.assertRaisesRegex(Exception, "HTTP Error"):
-            get_response("http://example.com/notfound")
+        with self.assertRaises(Exception, HTTPError):
+            get_response("https://example.com/notfound", retries=3, delay=2)
 
 
 class TestGetElement(unittest.TestCase):
@@ -116,6 +119,13 @@ class TestGetElement(unittest.TestCase):
         self.assertIsInstance(result, Tag)
         self.assertEqual(result.name, 'p')
         self.assertEqual(result.get_text(), "Some paragraph text.")
+
+    def test_get_nth_element(self):
+        """Should select and return the nth element Tag and get a specific attribute."""
+        rules = {'selector': 'li', 'attribute': 'text', 'item_type': 'single', 'index': 1}
+        result = get_element(self.soup, rules)
+        self.assertIsInstance(result, str)
+        self.assertEqual(result, "Paragraph")
 
     def test_get_list_of_elements(self):
         """Should select and return a list of matching elements."""
@@ -147,7 +157,7 @@ class TestScrapper(unittest.TestCase):
         rules = {
             "elements": {
                 "url": {
-                    "selector": "a", "attribute": "href", "prefix": "http://base.url"
+                    "selector": "a", "attribute": "href", "prefix": "http://base.url", "clean": ["TO_UPPERCASE"]
                 },
                 "title": {
                     "selector": "a", "attribute": "text", "remove": [" 1"]
@@ -159,9 +169,34 @@ class TestScrapper(unittest.TestCase):
         }
         result_dict = scrapper.iterate_elements(entry_element, rules)
         expected = {
-            'url': 'http://base.url/article1',
+            'url': 'http://base.url/article1'.upper(),
             'title': 'Article',
             'metadata': 'Category 1'
+        }
+        self.assertEqual(result_dict, expected)
+
+    def test_iterate_nested_elements(self):
+        """Should correctly process a nested element based on a set of rules."""
+        scrapper = Scrapper({}, MockArticle)
+        entry_element = self.html_soup.select_one('li.item')
+        rules = {
+            "elements": {
+                "url": {
+                    "selector": "a",
+                    "attribute": "element",
+                    "elements": {
+                        "link": {"attribute": "href", "prefix": "http://base.url"},
+                        "text": {"attribute": "text"},
+                    }
+                },
+            }
+        }
+        result_dict = scrapper.iterate_elements(entry_element, rules)
+        expected = {
+            'url': {
+                'link': 'http://base.url/article1',
+                'text': 'Article 1',
+            }
         }
         self.assertEqual(result_dict, expected)
 
@@ -183,11 +218,11 @@ class TestScrapper(unittest.TestCase):
 
         results = scrapper.scrap_list(content_file=SAMPLE_HTML)
 
-        self.assertEqual(len(results), 3)
+        self.assertEqual(len(results), 4)
         self.assertIsInstance(results[0], MockArticle)
         self.assertEqual(results[0].title, "Article 1")
         self.assertEqual(results[0].url, "/article1")
-        self.assertEqual(results[1].metadata, "Meta 2")
+        self.assertEqual(results[2].metadata, "Meta 2")
 
     def test_scrap_list_xml(self):
         """Should correctly scrape a list of items from an XML source."""
