@@ -174,11 +174,11 @@ class Scrapper(Generic[T]):
                     original, new = phrase.split('|')
                     if original != '' and new != '':
                         item = item.replace(original, new)
-            if item_rules.get('clean') is not None:
+            if item_rules.get('transform') is not None:
                 if not isinstance(item, str):
                     print("Can't apply cleaning function to entity that is not string")
                     continue
-                clean = item_rules.get('clean')
+                clean = item_rules.get('transform')
                 item = Cleaner().apply(item, clean)
             else: # default cleaning rules
                 if not isinstance(item, str):
