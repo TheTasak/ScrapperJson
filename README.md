@@ -133,7 +133,7 @@ to discuss what you would like to change or add.
 * Network error handling and retries ✅
 * More export options (file etc.) ✅
 * Rule-based data transformation and cleaning ✅ 
+* Custom pagination functions ✅ 
 * Login handling, session management
-* Custom pagination functions
 * Export to database
 * Support for asynchronous requests

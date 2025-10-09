@@ -14,6 +14,10 @@ class CleaningFunction(Enum):
     TO_LOWERCASE = auto()
     TO_UPPERCASE = auto()
     TO_TITLECASE = auto()
+    REPLACE = auto()
+    REMOVE = auto()
+    ADD_PREFIX = auto()
+    ADD_SUFFIX = auto()
     REMOVE_PREFIX = auto()
     REMOVE_SUFFIX = auto()
     EXTRACT_FIRST_NUMBER = auto()
@@ -70,10 +74,18 @@ class Cleaner:
                         processed_value = processed_value.removeprefix(rule.get('value'))
                     elif enum_member == CleaningFunction.REMOVE_SUFFIX:
                         processed_value = processed_value.removesuffix(rule.get('value'))
+                    elif enum_member == CleaningFunction.ADD_PREFIX:
+                        processed_value = rule.get('value') + processed_value
+                    elif enum_member == CleaningFunction.ADD_SUFFIX:
+                        processed_value = processed_value + rule.get('value')
                     elif enum_member == CleaningFunction.TO_DATE:
                         processed_value = datetime.strptime(processed_value, rule.get('format')).date()
                     elif enum_member == CleaningFunction.TO_DATETIME:
                         processed_value = datetime.strptime(processed_value, rule.get('format'))
+                    elif enum_member == CleaningFunction.REMOVE:
+                        processed_value = processed_value.replace(rule.get('value'), "")
+                    elif enum_member == CleaningFunction.REPLACE:
+                        processed_value = processed_value.replace(rule.get('old'), rule.get('new'))
             except(KeyError, IndexError, TypeError):
                 print(f"Warning: Could not apply invalid cleaning rule: {rule}")
                 continue
