@@ -1,6 +1,6 @@
 import json
 import time
-from typing import List, Type, Generic, TypeVar
+from typing import List, Type, Generic, TypeVar, Callable
 import re
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError
@@ -68,6 +68,14 @@ def get_response(url: str, retries: int, delay: int, debug: bool = False) -> str
 
 T = TypeVar('T')
 
+def _basic_pagination(root_url: str, start: int, limit: int):
+    url_list = []
+    for page in range(start, limit):
+        url = root_url.replace("{}", str(page))
+        url_list.append(url)
+    return url_list
+
+
 class Scrapper(Generic[T]):
     def __init__(self, rules: dict, result_class: Type[T]):
         self.rules = rules
@@ -115,7 +123,7 @@ class Scrapper(Generic[T]):
             entity_list.append(page_obj)
         return entity_list
 
-    def scrap_list(self, content_file: str = None) -> List[T]:
+    def scrap_list(self, custom_pagination: Callable = _basic_pagination, custom_params: dict = None, content_file: str = None) -> List[T]:
         entity_list = []
         if self.rules.get('type') == 'xml':
             if content_file is not None:
@@ -126,13 +134,16 @@ class Scrapper(Generic[T]):
         elif self.rules.get('type') == 'html':
             paginate = self.rules.get('pagination', False)
             if paginate and content_file is None:
-                limit = self.rules.get('pagination_limit', 100)
-                start = 1
-                for page in range(start, limit):
-                    url = self.root_url.replace("{}", str(page))
+                limit = self.rules.get('pagination_limit', 10)
+                start = self.rules.get('pagination_start', 1)
+                if custom_params is not None:
+                    url_list = custom_pagination(self.root_url, start, limit, **custom_params)
+                else:
+                    url_list = custom_pagination(self.root_url, start, limit)
+                for url in url_list:
                     response = get_response(url, self.retries, self.delay)
                     entity_list += self._scrap_list_html(response)
-                time.sleep(2)
+                    time.sleep(2)
             else:
                 if content_file is not None:
                     response = content_file
@@ -160,20 +171,7 @@ class Scrapper(Generic[T]):
 
             if item_rules.get('elements') is not None:
                 item = self.iterate_elements(item, item_rules)
-            if item_rules.get('prefix') is not None:
-                item = item_rules.get('prefix') + item
-            if item_rules.get('suffix') is not None:
-                item = item + item_rules.get('suffix')
-            if item_rules.get('remove') is not None:
-                remove = item_rules.get('remove')
-                for phrase in remove:
-                    item = item.replace(phrase, '')
-            if item_rules.get('replace') is not None:
-                replace = item_rules.get('replace')
-                for phrase in replace:
-                    original, new = phrase.split('|')
-                    if original != '' and new != '':
-                        item = item.replace(original, new)
+
             if item_rules.get('transform') is not None:
                 if not isinstance(item, str):
                     print("Can't apply cleaning function to entity that is not string")

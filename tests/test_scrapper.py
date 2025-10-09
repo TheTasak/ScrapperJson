@@ -158,10 +158,12 @@ class TestScrapper(unittest.TestCase):
         rules = {
             "elements": {
                 "url": {
-                    "selector": "a", "attribute": "href", "prefix": "http://base.url", "transform": ["TO_UPPERCASE"]
+                    "selector": "a",
+                    "attribute": "href",
+                    "transform": [{"name": "ADD_PREFIX", "value": "http://base.url"}, "TO_UPPERCASE"]
                 },
                 "title": {
-                    "selector": "a", "attribute": "text", "remove": [" 1"]
+                    "selector": "a", "attribute": "text", "transform": [{"name": "REMOVE", "value": " 1"}]
                 },
                 "metadata": {
                     "selector": "span", "attribute": "text", "index": 1, "transform": [{"name": "TO_DATE", "format": "%Y-%m-%d"}]
@@ -186,7 +188,7 @@ class TestScrapper(unittest.TestCase):
                     "selector": "a",
                     "attribute": "element",
                     "elements": {
-                        "link": {"attribute": "href", "prefix": "http://base.url"},
+                        "link": {"attribute": "href", "transform": [{"name": "ADD_PREFIX", "value": "http://base.url"}]},
                         "text": {"attribute": "text"},
                     }
                 },
