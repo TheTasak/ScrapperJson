@@ -9,7 +9,7 @@ pip install scrapper-json-jawron
 
 ## Usage:
 ```python
-from scrapper-json-jawron import Scrapper, get_rules_from_file
+from scrapper-json-jawron.scrapper import Scrapper, get_rules_from_file
 from dataclasses import dataclass
 
 # example result dataclass
@@ -46,12 +46,34 @@ for entity in result:
 
 ### Elements options
 * **selector:** Defines the CSS or XML selector for the element
+* **index:** Defines the index of the element to scrape, if a selector returns multiple elements
 * **item_type:** Defines the type of item, can be either `single` or `list`, `default: single`
 * **attribute:** Defines the attribute of element which will be scrapped, if scrapping text use `text`, else use the name of the attribute. You can also scrape an element as an object to use in nested properties. `default: text`
-* **prefix:** Defines the prefix which is added to the result property
-* **suffix:** Defines the suffix which is added to the result property
-* **remove:** Defines the text which is to be removed from the result property
-* **replace:** Defines the text which is to be replaced from the result property
+* **transform:** Defines the cleaning and transformation options to be executed on the result property
+* **prefix:** Defines the prefix which is added to the result property. To be moved in next version into transform.
+* **suffix:** Defines the suffix which is added to the result property. To be moved in next version into transform.
+* **remove:** Defines the text which is to be removed from the result property. To be moved in next version into transform.
+* **replace:** Defines the text which is to be replaced from the result property. To be moved in next version into transform.
+* **elements**: Defines the scrapped properties of an entity
+
+### Cleaning and transformation options
+#### Simple options (pass as string)
+* **REMOVE_NEWLINES:**
+* **STRIP:**
+* **TO_INTEGER:**
+* **TO_FLOAT:**
+* **COLLAPSE_WHITESPACE:**
+* **TO_LOWERCASE:**
+* **TO_UPPERCASE:**
+* **TO_TITLECASE:**
+* **EXTRACT_FIRST_NUMBER:**
+* **STRIP_HTML_TAGS:**
+
+#### Advanced options (pass as a dictionary)
+* **REMOVE_PREFIX:**
+* **REMOVE_SUFFIX:**
+* **TO_DATE:**
+* **TO_DATETIME:**
 
 ### Example HTML
 ```json
@@ -70,7 +92,8 @@ for entity in result:
   "elements": {
     "title": {
       "selector": "div.search-txt a h2",
-      "attribute": "text"
+      "attribute": "text",
+      "transform": ["REMOVE_NEWLINES", "STRIP", "TO_TITLECASE"]
     },
     "url": {
       "selector": "div.search-txt a",
@@ -109,7 +132,8 @@ to discuss what you would like to change or add.
 * Pagination handling ✅
 * Network error handling and retries ✅
 * More export options (file etc.) ✅
+* Rule-based data transformation and cleaning ✅ 
 * Login handling, session management
+* Custom pagination functions
 * Export to database
-* Rule-based data transformation and cleaning 
 * Support for asynchronous requests
