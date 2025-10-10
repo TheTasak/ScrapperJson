@@ -1,3 +1,4 @@
+import inspect
 from datetime import datetime
 from enum import Enum, auto
 import re
@@ -26,6 +27,10 @@ class CleaningFunction(Enum):
 class Cleaner:
     def __init__(self):
         self.rules_map = {
+            CleaningFunction.ADD_PREFIX: lambda text, value: value + text,
+            CleaningFunction.ADD_SUFFIX: lambda text, value: text + value,
+            CleaningFunction.REMOVE_PREFIX: lambda text, value: text.removeprefix(value),
+            CleaningFunction.REMOVE_SUFFIX: lambda text, value: text.removesuffix(value),
             CleaningFunction.STRIP: lambda text: text.strip(),
             CleaningFunction.REMOVE_NEWLINES: lambda text: text.replace('\n', ''),
             CleaningFunction.COLLAPSE_WHITESPACE: lambda text: re.sub(r'\s+', ' ', text).strip(),
@@ -36,6 +41,10 @@ class Cleaner:
             CleaningFunction.TO_FLOAT: self._to_float,
             CleaningFunction.EXTRACT_FIRST_NUMBER: self._extract_first_number,
             CleaningFunction.STRIP_HTML_TAGS: self._strip_html_tags,
+            CleaningFunction.TO_DATETIME: lambda text, date_format: datetime.strptime(text, date_format),
+            CleaningFunction.TO_DATE: lambda text, date_format: datetime.strptime(text, date_format).date(),
+            CleaningFunction.REMOVE: lambda text, value: text.replace(value, ''),
+            CleaningFunction.REPLACE: lambda text, old, new: text.replace(old, new),
         }
 
     def _to_int(self, text: str) -> int | str:
@@ -68,24 +77,31 @@ class Cleaner:
                     enum_member = CleaningFunction[rule]
                     if enum_member in self.rules_map:
                         processed_value = self.rules_map[enum_member](processed_value)
+                    else:
+                        print(f"Warning: Could not apply invalid cleaning rule: {rule}")
                 elif isinstance(rule, dict):
                     enum_member = CleaningFunction[rule.get('name')]
-                    if enum_member == CleaningFunction.REMOVE_PREFIX:
-                        processed_value = processed_value.removeprefix(rule.get('value'))
-                    elif enum_member == CleaningFunction.REMOVE_SUFFIX:
-                        processed_value = processed_value.removesuffix(rule.get('value'))
-                    elif enum_member == CleaningFunction.ADD_PREFIX:
-                        processed_value = rule.get('value') + processed_value
-                    elif enum_member == CleaningFunction.ADD_SUFFIX:
-                        processed_value = processed_value + rule.get('value')
-                    elif enum_member == CleaningFunction.TO_DATE:
-                        processed_value = datetime.strptime(processed_value, rule.get('format')).date()
-                    elif enum_member == CleaningFunction.TO_DATETIME:
-                        processed_value = datetime.strptime(processed_value, rule.get('format'))
-                    elif enum_member == CleaningFunction.REMOVE:
-                        processed_value = processed_value.replace(rule.get('value'), "")
-                    elif enum_member == CleaningFunction.REPLACE:
-                        processed_value = processed_value.replace(rule.get('old'), rule.get('new'))
+                    rule_dict = rule.copy()
+                    rule_dict.pop("name", None)
+                    if enum_member in self.rules_map:
+                        func = self.rules_map[enum_member]
+                        sig = inspect.signature(func)
+                        provided_args = set(rule_dict.keys())
+                        expected_args = set(sig.parameters.keys()) - {"text"}
+                        extra_args = provided_args - expected_args
+                        missing_args = expected_args - provided_args
+
+                        if len(extra_args) > 0:
+                            print(f"Unnecessary arguments: {extra_args}")
+                        if len(missing_args) > 0:
+                            print(f"Missing arguments: {missing_args}")
+
+                        if rule_dict is None:
+                            processed_value = func(processed_value)
+                        else:
+                            processed_value = func(processed_value, **rule_dict)
+                    else:
+                        print(f"Warning: Could not apply invalid cleaning rule: {rule}")
             except(KeyError, IndexError, TypeError):
                 print(f"Warning: Could not apply invalid cleaning rule: {rule}")
                 continue

@@ -166,7 +166,7 @@ class TestScrapper(unittest.TestCase):
                     "selector": "a", "attribute": "text", "transform": [{"name": "REMOVE", "value": " 1"}]
                 },
                 "metadata": {
-                    "selector": "span", "attribute": "text", "index": 1, "transform": [{"name": "TO_DATE", "format": "%Y-%m-%d"}]
+                    "selector": "span", "attribute": "text", "index": 1, "transform": [{"name": "TO_DATE", "date_format": "%Y-%m-%d"}]
                 }
             }
         }
@@ -219,7 +219,10 @@ class TestScrapper(unittest.TestCase):
 
         scrapper = Scrapper(rules, MockArticle)
 
-        results = scrapper.scrap_list(content_file=SAMPLE_HTML)
+        data = scrapper.scrap_list(content_file=SAMPLE_HTML)
+        results = []
+        for result in data:
+            results += result
 
         self.assertEqual(len(results), 4)
         self.assertIsInstance(results[0], MockArticle)
@@ -241,7 +244,10 @@ class TestScrapper(unittest.TestCase):
         }
 
         scrapper = Scrapper(rules, MockArticle)
-        results = scrapper.scrap_list(content_file=SAMPLE_XML)
+        data = scrapper.scrap_list(content_file=SAMPLE_XML)
+        results = []
+        for result in data:
+            results += result
 
         self.assertEqual(len(results), 2)
         self.assertEqual(results[0].title, "Atom-Powered Robots Run Amok")

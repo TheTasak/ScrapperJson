@@ -1,6 +1,6 @@
 import json
 import time
-from typing import List, Type, Generic, TypeVar, Callable
+from typing import List, Type, Generic, TypeVar, Callable, Any, Generator
 import re
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError
@@ -123,14 +123,15 @@ class Scrapper(Generic[T]):
             entity_list.append(page_obj)
         return entity_list
 
-    def scrap_list(self, custom_pagination: Callable = _basic_pagination, custom_params: dict = None, content_file: str = None) -> List[T]:
+    def scrap_list(self, custom_pagination: Callable = _basic_pagination, custom_params: dict = None, content_file: str = None) -> \
+    Generator[list[T], Any, None]:
         entity_list = []
         if self.rules.get('type') == 'xml':
             if content_file is not None:
                 response = content_file
             else:
                 response = get_response(self.root_url, self.retries, self.delay)
-            entity_list += self._scrap_list_xml(response)
+            yield self._scrap_list_xml(response)
         elif self.rules.get('type') == 'html':
             paginate = self.rules.get('pagination', False)
             if paginate and content_file is None:
@@ -142,16 +143,14 @@ class Scrapper(Generic[T]):
                     url_list = custom_pagination(self.root_url, start, limit)
                 for url in url_list:
                     response = get_response(url, self.retries, self.delay)
-                    entity_list += self._scrap_list_html(response)
+                    yield self._scrap_list_html(response)
                     time.sleep(2)
             else:
                 if content_file is not None:
                     response = content_file
                 else:
                     response = get_response(self.root_url, self.retries, self.delay)
-                entity_list += self._scrap_list_html(response)
-
-        return entity_list
+                yield self._scrap_list_html(response)
 
     def scrap_entity(self, article_rules: dict, entity: T) -> T:
         url = entity.url
