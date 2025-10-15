@@ -1,0 +1,29 @@
+{
+  "type": "html",
+  "url": "https://justjoin.it/job-offers/all-locations?orderBy=DESC&sortBy=newest",
+  "engine": "playwright",
+  "pagination": {
+    "scroll_amount": 4000,
+    "scroll_delay": 7
+  },
+  "root": {
+    "selector": "div#up-offers-list ul.MuiStack-root",
+    "attribute": "element"
+  },
+  "entry": {
+    "selector": "li",
+    "attribute": "element",
+    "item_type": "list"
+  },
+  "elements": {
+    "title": {
+      "selector": "h3.mui-1oq1vnc",
+      "attribute": "text"
+    },
+    "url": {
+      "selector": "a.offer-card",
+      "attribute": "href",
+      "transform": [{"name": "ADD_PREFIX", "value": "https://justjoin.it/"}]
+    }
+  }
+}

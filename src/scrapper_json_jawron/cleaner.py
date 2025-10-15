@@ -92,9 +92,9 @@ class Cleaner:
                         missing_args = expected_args - provided_args
 
                         if len(extra_args) > 0:
-                            print(f"Unnecessary arguments: {extra_args}")
+                            print(f"Warning: Unnecessary arguments: {extra_args}")
                         if len(missing_args) > 0:
-                            print(f"Missing arguments: {missing_args}")
+                            print(f"Warning: Missing arguments: {missing_args}")
 
                         if rule_dict is None:
                             processed_value = func(processed_value)

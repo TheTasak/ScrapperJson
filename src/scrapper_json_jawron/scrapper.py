@@ -1,14 +1,14 @@
 import json
+import csv
 import time
+import dataclasses
 from typing import List, Type, Generic, TypeVar, Callable, Any, Generator
-import re
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError
 import xml.etree.ElementTree as ET
 from bs4 import BeautifulSoup, Tag
-import dataclasses
-import csv
 from src.scrapper_json_jawron.cleaner import Cleaner
+from src.scrapper_json_jawron.playwright_engine import PlaywrightEngine, _playwright_pagination
 
 def get_rules_from_file(file: str) -> dict:
     with open(file, 'r') as f:
@@ -68,7 +68,10 @@ def get_response(url: str, retries: int, delay: int, debug: bool = False) -> str
 
 T = TypeVar('T')
 
-def _basic_pagination(root_url: str, start: int, limit: int):
+def _basic_pagination(root_url: str, params: dict):
+    start = params["start"]
+    limit = params["limit"]
+
     url_list = []
     for page in range(start, limit):
         url = root_url.replace("{}", str(page))
@@ -83,6 +86,10 @@ class Scrapper(Generic[T]):
         self.result_class = result_class
         self.retries = rules.get('retries', 3)
         self.delay = rules.get('delay', 2)
+        self.default_engine_pagination = {
+            "bs4": { "function": _basic_pagination, "params": { "start": 1, "limit": 10 } },
+            "playwright": { "function": _playwright_pagination, "params": { "scroll_amount": 200, "scroll_delay": 2, "limit": 10 } }
+        }
 
     def _scrap_list_html(self, response: str) -> List[T]:
         entity_list = []
@@ -92,7 +99,6 @@ class Scrapper(Generic[T]):
             item_dict = self.iterate_elements(entry, self.rules)
             page_obj = self.result_class(**item_dict)
             entity_list.append(page_obj)
-
         return entity_list
 
     def _scrap_list_xml(self, response: str) -> List[T]:
@@ -123,9 +129,8 @@ class Scrapper(Generic[T]):
             entity_list.append(page_obj)
         return entity_list
 
-    def scrap_list(self, custom_pagination: Callable = _basic_pagination, custom_params: dict = None, content_file: str = None) -> \
+    def scrap_list(self, content_file: str = None) -> \
     Generator[list[T], Any, None]:
-        entity_list = []
         if self.rules.get('type') == 'xml':
             if content_file is not None:
                 response = content_file
@@ -133,24 +138,36 @@ class Scrapper(Generic[T]):
                 response = get_response(self.root_url, self.retries, self.delay)
             yield self._scrap_list_xml(response)
         elif self.rules.get('type') == 'html':
-            paginate = self.rules.get('pagination', False)
-            if paginate and content_file is None:
-                limit = self.rules.get('pagination_limit', 10)
-                start = self.rules.get('pagination_start', 1)
-                if custom_params is not None:
-                    url_list = custom_pagination(self.root_url, start, limit, **custom_params)
+            engine = self.rules.get("engine", "bs4")
+            paginate_function = self.default_engine_pagination[engine]["function"]
+            paginate_params = self.default_engine_pagination[engine]["params"]
+            paginate_params.update({"paginate": self.rules.get("pagination", False) is not False})
+            paginate_params.update(self.rules.get("pagination", {}))
+
+            if engine == "bs4":
+                paginate = self.rules.get('pagination', False)
+                if paginate:
+                    url_list = paginate_function(self.root_url, paginate_params)
+                    for url in url_list:
+                        response = get_response(url, self.retries, self.delay)
+                        yield self._scrap_list_html(response)
                 else:
-                    url_list = custom_pagination(self.root_url, start, limit)
-                for url in url_list:
-                    response = get_response(url, self.retries, self.delay)
+                    if content_file is not None:
+                        response = content_file
+                    else:
+                        response = get_response(self.root_url, self.retries, self.delay)
                     yield self._scrap_list_html(response)
-                    time.sleep(2)
-            else:
-                if content_file is not None:
-                    response = content_file
-                else:
-                    response = get_response(self.root_url, self.retries, self.delay)
-                yield self._scrap_list_html(response)
+            elif engine == "playwright":
+                browser = PlaywrightEngine(paginate_function, paginate_params)
+                response = browser.load(self.root_url)
+                for site in response:
+                    yield self._scrap_list_html(site)
+                browser.stop()
+
+    def set_custom_pagination(self, engine: str, custom_pagination: Callable, custom_params: dict = None):
+        self.default_engine_pagination[engine]["function"] = custom_pagination
+        if custom_params is not None:
+            self.default_engine_pagination[engine]["custom_params"] = custom_params
 
     def scrap_entity(self, article_rules: dict, entity: T) -> T:
         url = entity.url

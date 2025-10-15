@@ -1,8 +1,9 @@
 {
   "type": "html",
   "url": "https://www.technewsworld.com/archive/page/{}",
-  "pagination": true,
-  "pagination_limit": 2,
+  "pagination": {
+    "limit": 2
+  },
   "root": {
     "selector": "div.category-article-list",
     "attribute": "element"
